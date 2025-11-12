@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <sys/socket.h>        // 소켓 관련 함수들
 #include <arpa/inet.h>         // IP 주소 변환 함수들 (inet_ntoa 등)
 #include <netinet/ip.h>        // IP 헤더 구조체 선언
