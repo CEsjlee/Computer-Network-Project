@@ -3,13 +3,15 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/socket.h>      // 소켓 함수들
-#include <arpa/inet.h>       // 네트워크 주소 변환 관련
-#include <netinet/ip.h>      // IP 헤더 구조체
-#include <linux/if_packet.h> // raw socket 정의 및 이더넷 헤더 구조체
-#include <net/ethernet.h>    // Ethernet 헤더 상수
+#include <sys/socket.h>      // 소켓 생성, recvfrom 등 주요 소켓함수 선언 헤더
+#include <arpa/inet.h>       // inet_ntoa 등 네트워크 주소 변환 함수 선언 헤더
+#include <netinet/ip.h>      // IPv4 헤더(struct iphdr) 구조체 선언 헤더
+#include <linux/if_packet.h> // PF_PACKET, SOCK_RAW 등 raw 소켓 정의 및 이더넷 헤더(struct ethhdr) 구조체 선언
+#include <net/ethernet.h>    // 이더넷 프레임 관련 상수, 매크로 선언 헤더
 
-// 이더넷 헤더 파싱 및 출력 함수
+// 이더넷 헤더 파싱 함수
+// raw socket으로 수신한 패킷 맨 앞은 이더넷 프레임
+// MAC 주소와 프로토콜 타입을 파싱해 출력함
 void parse_ethernet(unsigned char *buffer) {
     struct ethhdr *eth = (struct ethhdr *)buffer;
     printf("Ethernet Header\n");
@@ -22,10 +24,14 @@ void parse_ethernet(unsigned char *buffer) {
     printf("  Protocol: 0x%04X\n\n", ntohs(eth->h_proto));
 }
 
-// IP 헤더 파싱 및 출력 함수
+// IP 헤더 파싱 함수
+// 이더넷 헤더 바로 다음 위치에 IP 헤더가 있음
+// 출발지 IP, 목적지 IP와 프로토콜 번호 출력
 void parse_ip(unsigned char *buffer) {
     struct iphdr *iph = (struct iphdr*)buffer;
     struct sockaddr_in src, dst;
+
+    // IPv4 주소를 sockaddr_in 구조체에 할당 후 문자열로 변환
     src.sin_addr.s_addr = iph->saddr;
     dst.sin_addr.s_addr = iph->daddr;
 
@@ -36,36 +42,42 @@ void parse_ip(unsigned char *buffer) {
 }
 
 int main() {
-    // 1. Raw socket 생성
-    // AF_PACKET: 데이터 링크 계층 전체(packet interface)
-    // SOCK_RAW: 원시 소켓
-    // htons(ETH_P_ALL): 모든 프로토콜 수신하겠다는 설정
+    // 1. Raw 소켓 생성 - PF_PACKET: 데이터링크 계층, SOCK_RAW: 원시소켓
+    // ETH_P_ALL: 모든 프로토콜 패킷 수신
     int sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
-    if (sockfd < 0) {
-        perror("Socket creation error");
+    if(sockfd < 0) {
+        perror("Socket creation error");  // 소켓 생성 실패 시 원인 출력 후 종료
         return 1;
     }
 
-    unsigned char buffer[65536];
+    unsigned char buffer[65536]; // 최대 수신 버퍼 크기
 
-    while (1) {
-        // 2. 패킷 수신 (데이터 캡처)
-        int data_size = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
-        if (data_size < 0) {
-            perror("Recvfrom error");
+    while(1) {
+        // 2. 패킷 수신 - recvfrom으로 네트워크 인터페이스로부터 모든 패킷 수신
+        // buffer에 전체 이더넷 프레임 포함 패킷 수신
+        int size = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
+        if(size < 0) {
+            perror("Recvfrom error");  // 수신 오류 발생 시 출력 후 반복 종료
             break;
         }
 
         // 3. 이더넷 헤더 파싱 및 출력
+        // 캡처 데이터 맨 앞에 위치하는 이더넷 헤더 정보를 파싱
         parse_ethernet(buffer);
 
-        // 4. IP 헤더 파싱 및 출력 (이더넷 헤더 크기만큼 뒤로 이동)
-        parse_ip(buffer + sizeof(struct ethhdr));
-        
-        // TODO: TCP/UDP 헤더 파싱 구현
-        // TODO: HTTP/DNS 애플리케이션 데이터 파싱 구현
+        // 이더넷 헤더에 명시된 프로토콜 필드가 IP 프로토콜이면 IP 헤더 분석 수행
+        struct ethhdr *eth = (struct ethhdr*)buffer;
+        if(ntohs(eth->h_proto) == ETH_P_IP) {
+            // 이더넷 헤더 크기 만큼 뒤에 IP 헤더가 존재하므로 해당 위치 전달
+            parse_ip(buffer + sizeof(struct ethhdr));
+        }
+
+        // 나머지 구현할 부분
+
+        printf("-------------------------------------------------\n");
     }
 
-    close(sockfd);
+    close(sockfd);  // 소켓 닫기
     return 0;
 }
+
