@@ -73,6 +73,7 @@ int main() {
 
         // 프로토콜이 IP이면 IP 헤더 분석 수행
         if (ntohs(eth->h_proto) == ETH_P_IP) {
+            // 이더넷 헤더 크기 만큼 뒤에 IP 헤더가 존재하므로 해당 위치 전달
             parse_ip_header(buffer + sizeof(struct ethhdr));
         }
 
