@@ -18,7 +18,7 @@ void print_ip_header(unsigned char *buffer) {
     dst.sin_addr.s_addr = iph->daddr; // 목적지 주소
 
     // IP 주소와 프로토콜 번호 출력
-    printf("[IP 헤더 정보]\n");
+    printf("========== IP 헤더 정보 ==========\n");
     printf("출발지 IP: %s\n", inet_ntoa(src.sin_addr));
     printf("목적지 IP: %s\n", inet_ntoa(dst.sin_addr));
     printf("프로토콜 번호: %u\n\n", (unsigned int)iph->protocol);
@@ -44,7 +44,8 @@ int main() {
 
         print_ip_header(buffer); // IP 헤더 출력
 
-        printf("===============================\n\n");
+        printf("=================================\n");
+        
     }
 
     close(sockfd); // 소켓 닫기
