@@ -9,20 +9,7 @@
 #include <linux/if_packet.h>   // 리눅스의 RAW 소켓 인터페이스와 이더넷 헤더 정의
 #include <net/ethernet.h>      // 이더넷 프로토콜 관련 상수
 
-// 이더넷 헤더 분석 함수
-// 네트워크에서 캡처된 프레임의 맨 앞에는 이더넷 헤더가 있음
-// 이곳에서 출발지/목적지 MAC 주소 및 프로토콜 타입을 읽어 출력함
-void parse_ethernet_header(unsigned char *buffer) {
-    struct ethhdr *eth = (struct ethhdr *)buffer;
-    printf("===== Ethernet Header =====\n");
-    printf("Source MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-           eth->h_source[0], eth->h_source[1], eth->h_source[2],
-           eth->h_source[3], eth->h_source[4], eth->h_source[5]);
-    printf("Destination MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-           eth->h_dest[0], eth->h_dest[1], eth->h_dest[2],
-           eth->h_dest[3], eth->h_dest[4], eth->h_dest[5]);
-    printf("Protocol: 0x%04x\n\n", ntohs(eth->h_proto));
-}
+
 
 // IP 헤더 분석 함수
 // 이더넷 헤더 바로 뒤에 IP 헤더가 위치하고 있음
@@ -66,12 +53,9 @@ int main() {
             return 1;
         }
 
-        // 이더넷 헤더 분석
-        parse_ethernet_header(buffer);
-
         struct ethhdr *eth = (struct ethhdr *)buffer;
 
-        // 프로토콜이 IP이면 IP 헤더 분석 수행
+        // IP 헤더 분석 수행
         if (ntohs(eth->h_proto) == ETH_P_IP) {
             // 이더넷 헤더 크기 만큼 뒤에 IP 헤더가 존재하므로 해당 위치 전달
             parse_ip_header(buffer + sizeof(struct ethhdr));
