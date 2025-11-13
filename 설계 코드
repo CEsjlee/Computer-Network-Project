@@ -3,69 +3,51 @@
 #include <string.h>
 #include <unistd.h>
 
-#include <sys/socket.h>        // 소켓 관련 함수들
-#include <arpa/inet.h>         // IP 주소 변환 함수들
-#include <netinet/ip.h>        // IP 헤더 구조체 선언
-#include <linux/if_packet.h>   // 리눅스의 RAW 소켓 인터페이스와 이더넷 헤더 정의
-#include <net/ethernet.h>      // 이더넷 프로토콜 관련 상수
+#include <sys/socket.h>      // 소켓 관련 함수 선언
+#include <arpa/inet.h>       // IP 주소 변환 함수 사용
+#include <netinet/ip.h>      // IP 헤더 구조체 정의 포함
+#include <linux/if_packet.h> // RAW 소켓과 이더넷 헤더 정의
+#include <net/ethernet.h>    // 이더넷 프로토콜 상수 포함
 
+// IP 헤더 출력 함수
+void print_ip_header(unsigned char *buffer) {
+    struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr)); // 이더넷 헤더 크기만큼 건너뜀
+    struct sockaddr_in src, dst;
 
+    src.sin_addr.s_addr = iph->saddr; // 출발지 주소
+    dst.sin_addr.s_addr = iph->daddr; // 목적지 주소
 
-// IP 헤더 분석 함수
-// 이더넷 헤더 바로 뒤에 IP 헤더가 위치하고 있음
-// IP 헤더에서 출발지, 목적지 IP 주소와 프로토콜 번호를 출력함
-void parse_ip_header(unsigned char *buffer) {
-    struct iphdr *ip = (struct iphdr *)buffer;
-    struct sockaddr_in source, dest;
-
-    // 출발지 IP 주소 지정
-    source.sin_addr.s_addr = ip->saddr;
-    // 목적지 IP 주소 지정
-    dest.sin_addr.s_addr = ip->daddr;
-
-    printf("===== IP Header =====\n");
-    printf("Source IP: %s\n", inet_ntoa(source.sin_addr));
-    printf("Destination IP: %s\n", inet_ntoa(dest.sin_addr));
-    printf("Protocol: %u\n\n", (unsigned int)ip->protocol);
+    // IP 주소와 프로토콜 번호 출력
+    printf("[IP 헤더 정보]\n");
+    printf("출발지 IP: %s\n", inet_ntoa(src.sin_addr));
+    printf("목적지 IP: %s\n", inet_ntoa(dst.sin_addr));
+    printf("프로토콜 번호: %u\n\n", (unsigned int)iph->protocol);
 }
 
 int main() {
-    // Raw socket 생성
-    // PF_PACKET: 데이터 링크 계층에서 직접 수신 (이더넷)
-    // SOCK_RAW: 원시 패킷 직접 수신
-    // htons(ETH_P_ALL): 모든 프로토콜 패킷 수신
-    int sockfd = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    // raw socket 생성: 모든 프로토콜 패킷 수신
+    int sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sockfd < 0) {
-        perror("Socket 생성 실패");
+        perror("소켓 생성 실패");
         return 1;
     }
 
-    unsigned char buffer[65536];  // 수신된 패킷을 담을 버퍼
+    unsigned char buffer[65536]; // 패킷 수신 버퍼
 
-    printf("패킷 수신 중...\n\n");
-
+    // 패킷 수신 루
     while (1) {
-        // 네트워크 인터페이스로부터 패킷 수신
-        int packet_size = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
-        if (packet_size < 0) {
-            perror("패킷 수신 실패");
-            close(sockfd);
-            return 1;
+        int size = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
+        if (size < 0) {
+            perror("수신 실패");
+            break;
         }
 
-        struct ethhdr *eth = (struct ethhdr *)buffer;
+        print_ip_header(buffer); // IP 헤더 출력
 
-        // IP 헤더 분석 수행
-        if (ntohs(eth->h_proto) == ETH_P_IP) {
-            // 이더넷 헤더 크기 만큼 뒤에 IP 헤더가 존재하므로 해당 위치 전달
-            parse_ip_header(buffer + sizeof(struct ethhdr));
-        }
-
-        printf("==============================\n\n");
+        printf("===============================\n\n");
     }
 
-    // 소켓 닫기
-    close(sockfd);
+    close(sockfd); // 소켓 닫기
     return 0;
 }
 
