@@ -34,7 +34,7 @@ int main() {
 
     unsigned char buffer[65536]; // 패킷 수신 버퍼
 
-    // 패킷 수신 루
+    // 패킷 수신 루프
     while (1) {
         int size = recvfrom(sockfd, buffer, sizeof(buffer), 0, NULL, NULL);
         if (size < 0) {
